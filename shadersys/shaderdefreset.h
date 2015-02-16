@@ -1,0 +1,23 @@
+#undef SHADER
+#undef P2
+#undef P3
+#undef MAT_BEGIN
+#undef MAT_END
+#undef UNI_MAT4
+#undef UNI_INT
+#undef UNI_FLOAT
+#undef UNI_VEC2
+#undef UNI_VEC3
+#undef UNI_VEC4
+
+#define SHADER(...)
+#define P2(...)
+#define P3(...)
+#define MAT_BEGIN(...)
+#define MAT_END(...)
+#define UNI_MAT4(...)
+#define UNI_INT(...)
+#define UNI_FLOAT(...)
+#define UNI_VEC2(...)
+#define UNI_VEC3(...)
+#define UNI_VEC4(...)

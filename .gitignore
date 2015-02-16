@@ -1,0 +1,10 @@
+*.ncb
+*.suo
+*.vcxproj
+*.sln
+*.vcproj.*
+*.vcxproj.*
+*.sdf
+*.opensdf
+ipch
+build
