@@ -24,7 +24,7 @@ void ZShaderEx::Update()
 	{
 		sources[i]->Update();
 
-		if (compileTime < sources[i]->readTime)
+		if (compileTime < sources[i]->updateTime)
 			mustCompile = true;
 	}
 

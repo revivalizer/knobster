@@ -1,39 +1,43 @@
 #pragma once
 
-#ifndef STANDALONE // DEVELOPMENT
-	class ZWatchFile : public align16
+class ZSource
+{
+public:
+	ZSource()
+		: data(nullptr)
+		, updateTime(-1) // when was the file last read?
+		, checkTime(-1)
 	{
-	public:
-		ZWatchFile(const char* path);
-		~ZWatchFile(void);
 
-		void Update(void);
+	}
+	virtual void Update(void) {};
 
-		char* data;
+	char* data;
 
-		int32_t checkTime;
-		int32_t readTime;
+	int32_t checkTime;
+	int32_t updateTime;
+};
 
-		#ifndef SWIG
-			HANDLE hFile;
-			FILETIME ftLastRead;
-		#endif
+class ZStaticString : public ZSource
+{
+public:
+	ZStaticString(char* str);
+	virtual void Update(void);
+};
 
-		private:
-			const char* path;
-	};
-#else // STANDALONE
-	class ZWatchFile : public align16
-	{
-	public:
-		ZWatchFile(const char* path);
+class ZWatchFile : public ZSource
+{
+public:
+	ZWatchFile(const char* path);
+	~ZWatchFile(void);
 
-		void Update(void);
+	virtual void Update(void);
 
-		char* data;
+	#ifndef SWIG
+		HANDLE hFile;
+		FILETIME ftLastRead;
+	#endif
 
-		int32_t checkTime;
-		int32_t readTime;
-	};
-#endif
-
+	private:
+		const char* path;
+};

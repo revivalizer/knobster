@@ -8,3 +8,4 @@
 *.opensdf
 ipch
 build
+*.png

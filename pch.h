@@ -8,8 +8,8 @@
 
 #include "shadersys/shaderex.h"
 #include "shadersys/programex.h"
-#include "shadersys/shadersys.h"
-#include "shadersys/materials.h"
+//#include "shadersys/shadersys.h"
+//#include "shadersys/materials.h"
 
 extern int32_t curFrame;
 

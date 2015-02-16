@@ -6,7 +6,7 @@ public:
 	ZShaderEx(ZShaderType type);
 	virtual ~ZShaderEx(void);
 
-	zvector<ZWatchFile*> sources;
+	zvector<ZSource*> sources;
 
 	int32_t compileTime;
 	int32_t checkTime;
