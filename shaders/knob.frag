@@ -1,9 +1,3 @@
-#version 330
-
-in vec2 pos;
-
-uniform float iGlobalTime;
-
 float saturate(float v)
 {
 	return clamp(v,0.0,1.0);
@@ -98,7 +92,8 @@ vec4 bgshade(vec2 p)
 	return vec4(0.0);
 }
 
-void main() {
+vec4 generate(vec2 pos, float v)
+{
 	vec2 p = pos*29.0-14.5;
 	float r = dist(p);
 
@@ -136,9 +131,15 @@ void main() {
 //		col = grey(0.4, blurcircle(p, 0.2, 1.1));
 	}
 
+// grid
 //	if (fract(p.x + 0.5) < 0.06 || fract(p.y+0.5) < 0.06)
 //		col = vec4(0.0);
 
+	return col;
+}
+
+vec4 gamma(vec4 col)
+{
 	float gamma = 1.0/2.2;
-	gl_FragColor = vec4(pow(col.rgb, vec3(gamma)), col.a);
-} 
+	return vec4(pow(col.rgb, vec3(gamma)), col.a);
+}

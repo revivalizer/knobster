@@ -143,6 +143,17 @@ char* passthrough =
 	"	gl_FragColor = texture2D(tex, pos);\n"
 	"}\n";
 
+char* generatorprelude =
+	"#version 330\n"
+	"in vec2 pos;\n"
+	"uniform float v;\n";
+
+char* generatordisplay =
+	"void main()\n"
+	"{\n"
+		"gl_FragColor = gamma(generate(pos, v));\n"
+	"} \n";
+
 class ZMPassthrough : public ZMaterial 
 {
 public:
@@ -195,7 +206,9 @@ public:
 		program->gs = new ZShaderEx(kGeometryShader);
 		program->gs->sources.push_back(new ZStaticString(emitquad));
 		program->fs = new ZShaderEx(kFragmentShader);
+		program->fs->sources.push_back(new ZStaticString(generatorprelude));
 		program->fs->sources.push_back(new ZWatchFile("shaders/knob.frag"));
+		program->fs->sources.push_back(new ZStaticString(generatordisplay));
 		v = 0.f; loc_v = -1;
 	}
 
