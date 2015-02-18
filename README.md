@@ -13,7 +13,7 @@ It would be tedious to draw all 128 images by hand, so people turn to tools to h
 Other tools exist to solve this problem.
 
 * Knobman: http://www.g200kg.com/en/software/knobman.html
-  Knobman is a GUI based tool. Because it has a GUI, there are limitations to it's flexibility.
+  Knobman is a GUI based tool. Because it has a GUI, there are limitations to its flexibility.
 
 # knobster
 knobster uses *fragment shaders* to generate images on the GPU. This might sound like a weird way to do it, but it has some advantages. 
@@ -26,8 +26,8 @@ knobster uses *fragment shaders* to generate images on the GPU. This might sound
 
 To use knobster you need to do two things:
 
-1) Create or edit a generator file (a fragment shader in disguise)
-2) Call knobster with the right command-line arguments
+1. Create or edit a generator file (a fragment shader in disguise)
+2. Call knobster with the right command-line arguments
 
 ## The generator
 
