@@ -15,12 +15,8 @@ solution "knobster"
 		files "main.cpp"
 		files { "pch.cpp", "pch.h" }
 		files "config.h"
---		files "shadersys/*"
+		files "shadersys/*"
 		files "watchfile.*"
-		files "shaders.h"
-		files "shadersys/emb*"
-		files "shadersys/programex*"
-		files "shadersys/shaderex*"
 
 		buildoptions { "/wd4189" } -- 4189 needed fpr stb_image_write
 

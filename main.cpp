@@ -256,7 +256,7 @@ public:
 class ZMDisplay : public ZMaterial 
 {
 public:
-	ZMDisplay()
+	ZMDisplay(const char* generatorPath)
 	{
 		program = new ZProgramEx();
 		program->vs = new ZShaderEx(kVertexShader);
@@ -265,7 +265,7 @@ public:
 		program->gs->sources.push_back(new ZStaticString(emitquad));
 		program->fs = new ZShaderEx(kFragmentShader);
 		program->fs->sources.push_back(new ZStaticString(generatorprelude));
-		program->fs->sources.push_back(new ZWatchFile("shaders/knob.frag"));
+		program->fs->sources.push_back(new ZWatchFile(generatorPath));
 		program->fs->sources.push_back(new ZStaticString(generatordisplay));
 		v = 0.f; loc_v = -1;
 	}
@@ -299,7 +299,7 @@ public:
 class ZMOversample : public ZMaterial 
 {
 public:
-	ZMOversample()
+	ZMOversample(const char* generatorPath)
 	{
 		program = new ZProgramEx();
 		program->vs = new ZShaderEx(kVertexShader);
@@ -308,7 +308,7 @@ public:
 		program->gs->sources.push_back(new ZStaticString(emitquad));
 		program->fs = new ZShaderEx(kFragmentShader);
 		program->fs->sources.push_back(new ZStaticString(generatorprelude));
-		program->fs->sources.push_back(new ZWatchFile("shaders/knob.frag"));
+		program->fs->sources.push_back(new ZWatchFile(generatorPath));
 		program->fs->sources.push_back(new ZStaticString(generatoroversample));
 		v = 0.f; loc_v = -1;
 		oversample = 0.f; loc_oversample = -1;
@@ -479,8 +479,8 @@ int main(int argc, char* argv[])
 
 	wglSwapIntervalEXT(1);
 
-	ZMDisplay knobMat;
-	ZMOversample knobMatOversample;
+	ZMDisplay knobMat(knobfile);
+	ZMOversample knobMatOversample(knobfile);
 	ZMPassthrough passthrough;
 
 	auto mainFBO = ZFBO(ZFBODescriptor(viewportWidth, viewportHeight));

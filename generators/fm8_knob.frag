@@ -1,3 +1,6 @@
+// generate : knobster -g -k generators/fm8_knob.frag -w 29 -h 29 -o 15 -n 128 -f knob.png
+// display  : knobster -d -k generators/fm8_knob.frag -w 29 -h 29 -o 15
+
 float saturate(float v)
 {
 	return clamp(v,0.0,1.0);
