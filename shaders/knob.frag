@@ -126,7 +126,7 @@ vec4 generate(vec2 pos, float v)
 
 		col.rgb += inrange(r, 7.5, 9.5)*2.0*pow(dot(p/15.0, vec2(0.0, 1.0)*1.0), 3.0);
 
-		col = overlay(col, box((translate(rotate(p, degtorad(90.0)), vec2(4.0, 0.0))), 2.5, 0.5, grey(0.0, 1.0)));
+		col = overlay(col, box((translate(rotate(p, degtorad(90.0+135.0 - 270.0*v)), vec2(4.0, 0.0))), 2.5, 0.5, grey(0.0, 1.0)));
 
 //		col = grey(0.4, blurcircle(p, 0.2, 1.1));
 	}

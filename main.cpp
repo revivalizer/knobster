@@ -1,7 +1,13 @@
 #include "pch.h"
+#include <iostream>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+
+#pragma warning(push)
+#pragma warning(disable: 4510 4512 4610 4127 4701 4703)
+#include "optionparser.h"
+#pragma warning(pop)
 
 int curFrame;
 
@@ -238,22 +244,131 @@ public:
 	float v; ZUniLoc loc_v;
 };
 
+struct Arg: public option::Arg
+{
+  static void printError(const char* msg1, const option::Option& opt, const char* msg2)
+  {
+    fprintf(stderr, "%s", msg1);
+    fwrite(opt.name, opt.namelen, 1, stderr);
+    fprintf(stderr, "%s", msg2);
+  }
+
+  static option::ArgStatus Unknown(const option::Option& option, bool msg)
+  {
+    if (msg) printError("Unknown option '", option, "'\n");
+    return option::ARG_ILLEGAL;
+  }
+
+  static option::ArgStatus Required(const option::Option& option, bool msg)
+  {
+    if (option.arg != 0)
+      return option::ARG_OK;
+
+    if (msg) printError("Option '", option, "' requires an argument\n");
+    return option::ARG_ILLEGAL;
+  }
+
+  static option::ArgStatus NonEmpty(const option::Option& option, bool msg)
+  {
+    if (option.arg != 0 && option.arg[0] != 0)
+      return option::ARG_OK;
+
+    if (msg) printError("Option '", option, "' requires a non-empty argument\n");
+    return option::ARG_ILLEGAL;
+  }
+
+  static option::ArgStatus Numeric(const option::Option& option, bool msg)
+  {
+    char* endptr = 0;
+    if (option.arg != 0 && strtol(option.arg, &endptr, 10)){};
+    if (endptr != option.arg && *endptr == 0)
+      return option::ARG_OK;
+
+    if (msg) printError("Option '", option, "' requires a numeric argument\n");
+    return option::ARG_ILLEGAL;
+  }
+};
+
+enum  optionIndex { UNKNOWN, ACTION, GENERATORFILE, WIDTH, HEIGHT, OVERSAMPLING, NUM, OUTFILE };
+
+enum
+{
+	kActionDisplay = 0,
+	kActionGenerate = 1,
+};
+
+const option::Descriptor usage[] = {
+{ UNKNOWN, 0,"", "",        Arg::Unknown, "USAGE: knobster [options]\n\n"
+                                          "Options:" },
+{ ACTION,        kActionDisplay,  "d", "display",       Arg::None,     "  -d <arg>, \t--display            \tAction: display high res version of knob." },
+{ ACTION,        kActionGenerate, "g", "generate",      Arg::None,     "  -g <arg>, \t--generate           \tAction: generate downsampled version of knob." },
+{ GENERATORFILE, 0,               "k", "knobfile",     Arg::Required, "  -k <arg>, \t--knobfile=<arg>     \tPath to GLSL generator file." },
+{ WIDTH,         0,               "w", "width",        Arg::Numeric,  "  -w <arg>, \t--width=<arg>        \tWidth in pixels of output images." },
+{ HEIGHT,        0,               "h", "height",       Arg::Numeric,  "  -h <arg>, \t--height=<arg>       \tHeight in pixels of output images." },
+{ OVERSAMPLING,  0,               "o", "oversampling", Arg::Numeric,  "  -o <arg>, \t--oversampling=<arg> \tOversampling amount in both generator and display." },
+{ NUM,           0,               "n", "num",          Arg::Numeric,  "  -n <arg>, \t--num=<arg>          \tNumber of images in strip." },
+{ OUTFILE,       0,               "f", "file",         Arg::Required, "  -f <arg>, \t--file=<arg>         \tPNG output file path." },
+  
+{ UNKNOWN, 0,"", "",        Arg::None,
+ "\nExamples:\n"
+ "  knobster -d -k knob.frag -w 29 -h 29 -o 16"
+ "  knobster -g -k knob.frag -w 29 -h 29 -o 16 -n 1 -f knob.png"
+},
+{ 0, 0, 0, 0, 0, 0 } };
 
 int main(int argc, char* argv[])
 {
-	argc, argv;
+	argc-=(argc>0); argv+=(argc>0); // skip program name argv[0] if present
+	option::Stats   stats(usage, argc, argv);
+	option::Option* options = new option::Option[stats.options_max];
+	option::Option* buffer = new option::Option[stats.buffer_max];
+	option::Parser  parse(usage, argc, argv, options, buffer);
+
+	if (parse.error())
+		return 1;
+
+	if (argc == 0) {
+		option::printUsage(std::cout, usage);
+		return 0;
+	}
+
+	if (!options[ACTION].name)
+		fprintf(stderr, "You must specify either display or generate action.");
+	if (!options[GENERATORFILE].name)
+		fprintf(stderr, "You must specify a path for a GLSL generator.");
+	if (!options[WIDTH].name)
+		fprintf(stderr, "You must specify width.");
+	if (!options[HEIGHT].name)
+		fprintf(stderr, "You must specify height.");
+	if (!options[OVERSAMPLING].name)
+		fprintf(stderr, "You must specify oversampling amount.");
+
+	auto action = options[ACTION].type();
+
+	if (action==kActionGenerate)
+	{
+		if (!options[NUM].name)
+			fprintf(stderr, "You must specify number of subimages when generating.");
+		if (!options[OUTFILE].name)
+			fprintf(stderr, "You must specify PNG output file name when generating.");
+	}
+
+	auto knobfile = options[GENERATORFILE].arg;
+	auto width = atoi(options[WIDTH].arg);
+	auto height = atoi(options[HEIGHT].arg);
+	auto oversampling = atoi(options[OVERSAMPLING].arg);
 
 	// Init window
 	ZGLWindow window;
 
 	bool isFullscreen = false;
-	uint32_t windowWidth = 640, windowHeight = 480;
+	uint32_t windowWidth = action==kActionGenerate ? width : width*oversampling, windowHeight = action==kActionGenerate ? height : height*oversampling;
 
 	window.Open(windowWidth, windowHeight, isFullscreen);
 
 	// Limit to 16:9 format.
-	uint32_t viewportWidth = zmin(windowWidth, windowHeight);
-	uint32_t viewportHeight = zmin(windowHeight, windowWidth);
+	uint32_t viewportWidth = windowWidth;
+	uint32_t viewportHeight = windowHeight;
 
 	InitOpenGLExtensions();
 
@@ -270,74 +385,107 @@ int main(int argc, char* argv[])
 	auto mainFBO = ZFBO(ZFBODescriptor(viewportWidth, viewportHeight));
 	auto colorTex  = ZTexture(ZTextureDescriptor::Texture2D(viewportWidth, viewportHeight, kTextureFormatRGBA16));
 
-	uint8_t data[480*480*4];
+//	uint8_t data[480*480*4];
 
-	while (window.isRunning)
+	if (action==kActionDisplay)
 	{
-		curFrame++;
-
-		window.HandleEvents();
-
-		double time = timer.Get();
-
-/*		renderer.Reset();
-
-		renderer.pm() = IdentityMatrix();
-		renderer.vm() = IdentityMatrix();
-		renderer.mm() = IdentityMatrix();
-
-		renderer.GetTextureUnit(0).BindTexture(  final    , GetNearestSampler());
-		//renderer.GetTextureUnit(0).BindTexture(ball->curPos, GetNearestSampler());
-		passthrough.tex = 0;
-		passthrough.Activate(renderer);
-
-		renderer.UnbindFBO();
-
-		renderer.SetBlendMode(kBlendOff);
-		renderer.SetZBufferMode(kZBufferOff);
-
-		uint32_t yOffset = (windowHeight - viewportHeight)/2;
-		uint32_t xOffset = (windowWidth - viewportWidth)/2;
-
-		glViewport(xOffset, yOffset, viewportWidth, viewportHeight);
-		glScissor(xOffset, yOffset, viewportWidth, viewportHeight);
-
-		ZPointCloud<ZPoint>::RenderSinglePoint();
-		*/
-		renderer.Reset();
-		//renderer.pm() = PerspectiveMatrix(60.0f, float(viewportWidth)/float(viewportHeight), 1.0f, 180.0f);
-		renderer.pm() = IdentityMatrix();
-		renderer.vm() = IdentityMatrix();
-		renderer.mm() = IdentityMatrix();
-
-		SetupFBO(renderer, &mainFBO, nullptr, &colorTex);
-
-		renderer.Clear(kClearDepthBuffer | kClearColorBuffer);
-		renderer.SetBlendMode(kBlendOff);
-		renderer.SetCullingMode(kCullingShowFrontAndBack);
-		renderer.SetZBufferMode(kZBufferOff);
-//		knobMat.iGlobalTime = (float)time;
-		knobMat.Update();
-		knobMat.Activate(renderer);
-		ZPointCloud<ZPoint>::RenderSinglePoint();
-
-		renderer.UnbindFBO();
-
-		renderer.GetTextureUnit(0).BindTexture(&colorTex);
-		//renderer.GetTextureUnit(0).BindTexture(ball->curPos, GetNearestSampler());
-		passthrough.tex = 0;
-		passthrough.Activate(renderer);
-
-		ZPointCloud<ZPoint>::RenderSinglePoint();
-
-		if (curFrame==2)
+		while (window.isRunning)
 		{
-			glReadPixels(0, 0, 480, 480, GL_RGBA, GL_UNSIGNED_BYTE, data);
-			stbi_write_png("out.png", 480, 480, 4, data + 479*480*4, -480*4);
+			curFrame++;
+
+			window.HandleEvents();
+
+			double time = timer.Get();
+
+			renderer.Reset();
+			renderer.pm() = IdentityMatrix();
+			renderer.vm() = IdentityMatrix();
+			renderer.mm() = IdentityMatrix();
+
+			SetupFBO(renderer, &mainFBO, nullptr, &colorTex);
+
+			renderer.Clear(kClearDepthBuffer | kClearColorBuffer);
+			renderer.SetBlendMode(kBlendOff);
+			renderer.SetCullingMode(kCullingShowFrontAndBack);
+			renderer.SetZBufferMode(kZBufferOff);
+			knobMat.v = (float)(fmod(time/30.0, 1.0));
+			knobMat.Update();
+			knobMat.Activate(renderer);
+			ZPointCloud<ZPoint>::RenderSinglePoint();
+
+			renderer.UnbindFBO();
+
+			renderer.GetTextureUnit(0).BindTexture(&colorTex);
+			passthrough.tex = 0;
+			passthrough.Activate(renderer);
+
+			ZPointCloud<ZPoint>::RenderSinglePoint();
+
+			// Swap buffers
+			window.SwapBuffers();
 		}
 
-		// Swap buffers
-		window.SwapBuffers();
+	/*		if (curFrame==2)
+			{
+				glReadPixels(0, 0, 480, 480, GL_RGBA, GL_UNSIGNED_BYTE, data);
+				stbi_write_png("out.png", 480, 480, 4, data + 479*480*4, -480*4);
+			}*/
+
+
+	}
+
+	if (action==kActionGenerate)
+	{
+		auto num = atoi(options[NUM].arg);
+		auto outfile = options[OUTFILE].arg;
+
+		uint8_t* data = new uint8_t[width*height*4*num];
+
+		for (int32_t i=0; i<num; i++)
+		{
+			curFrame++;
+
+			window.HandleEvents();
+
+			double time = timer.Get();
+
+			renderer.Reset();
+			renderer.pm() = IdentityMatrix();
+			renderer.vm() = IdentityMatrix();
+			renderer.mm() = IdentityMatrix();
+
+			SetupFBO(renderer, &mainFBO, nullptr, &colorTex);
+
+			renderer.Clear(kClearDepthBuffer | kClearColorBuffer);
+			renderer.SetBlendMode(kBlendOff);
+			renderer.SetCullingMode(kCullingShowFrontAndBack);
+			renderer.SetZBufferMode(kZBufferOff);
+			knobMat.v = float(i)/float(num-1);
+			knobMat.Update();
+			knobMat.Activate(renderer);
+			ZPointCloud<ZPoint>::RenderSinglePoint();
+
+			renderer.UnbindFBO();
+
+			renderer.GetTextureUnit(0).BindTexture(&colorTex);
+			passthrough.tex = 0;
+			passthrough.Activate(renderer);
+
+			ZPointCloud<ZPoint>::RenderSinglePoint();
+
+			// Swap buffers
+			window.SwapBuffers();
+
+			glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data+width*height*4*(num-1-i)); // write data backwards
+		}
+
+		stbi_write_png("out.png", width, height*num, 4, data + (num*height-1)*width*4, -width*4);
+
+	/*		if (curFrame==2)
+			{
+			}*/
+
+
 	}
 
 	ExitProcess(0); // This is neccesary to shut down song thread
