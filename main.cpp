@@ -152,13 +152,54 @@ char* passthrough =
 char* generatorprelude =
 	"#version 330\n"
 	"in vec2 pos;\n"
-	"uniform float v;\n";
+	"uniform vec2 pxSize;\n"
+	"uniform float v;\n"
+	"uniform float oversample;\n";
 
 char* generatordisplay =
 	"void main()\n"
 	"{\n"
 		"gl_FragColor = gamma(generate(pos, v));\n"
 	"} \n";
+
+char* generatoroversample =
+	"float lanczos(float x, float a)\n"
+	"{\n"
+		"if (x < -a || x > a)\n"
+			"return 0.0;\n"
+		"if (x==0.f)\n"
+			"return 1.f;\n"
+"\n"
+		"float pi = 3.1415926;\n"
+		"return a*sin(pi*x)*sin(pi*x/a) / (x*x*pi*pi);\n"
+	"}\n"
+"\n"
+	"void main()\n"
+	"{\n"
+		"float a = 3.0;\n"
+		"float delta = 2.0*a/(oversample-1.0);\n"
+"\n"
+		"vec4 s = vec4(0.0);\n"
+		"float accWeight = 0.0;\n"
+"\n"
+		"for (int y=0; y<oversample; y++)\n"
+		"{\n"
+			"for (int x=0; x<oversample; x++)\n"
+			"{\n"
+				"vec2 offset = vec2(-a + float(x)*delta, -a + float(y)*delta);\n"
+				"float d = sqrt(offset.x*offset.x + offset.y*offset.y);\n"
+				"vec2 p = pos + pxSize*offset;\n"
+				"float weight = lanczos(d, a);\n"
+				"s += generate(p, v)*weight;\n"
+				"accWeight += weight;\n"
+			"}\n"
+		"}\n"
+"\n"
+		"s /= accWeight;\n"
+"\n"
+		"gl_FragColor = gamma(s);\n"
+	"}\n";
+
 
 class ZMPassthrough : public ZMaterial 
 {
@@ -201,10 +242,10 @@ public:
 	int32_t tex; ZUniLoc loc_tex;
 };
 
-class ZMGenerate : public ZMaterial 
+class ZMDisplay : public ZMaterial 
 {
 public:
-	ZMGenerate()
+	ZMDisplay()
 	{
 		program = new ZProgramEx();
 		program->vs = new ZShaderEx(kVertexShader);
@@ -243,6 +284,54 @@ public:
 
 	float v; ZUniLoc loc_v;
 };
+
+class ZMOversample : public ZMaterial 
+{
+public:
+	ZMOversample()
+	{
+		program = new ZProgramEx();
+		program->vs = new ZShaderEx(kVertexShader);
+		program->vs->sources.push_back(new ZStaticString(pointpassthrough));
+		program->gs = new ZShaderEx(kGeometryShader);
+		program->gs->sources.push_back(new ZStaticString(emitquad));
+		program->fs = new ZShaderEx(kFragmentShader);
+		program->fs->sources.push_back(new ZStaticString(generatorprelude));
+		program->fs->sources.push_back(new ZWatchFile("shaders/knob.frag"));
+		program->fs->sources.push_back(new ZStaticString(generatoroversample));
+		v = 0.f; loc_v = -1;
+		oversample = 0.f; loc_oversample = -1;
+	}
+
+	virtual void Update()
+	{
+		if (checkTime==curFrame)
+				return;
+		
+		checkTime = curFrame; 
+		program->Update(); 
+		
+		if (updateTime < program->linkTime)
+		{
+			updateTime = curFrame;
+			loc_v = ZUniform::GetLoc(*program, "v");
+			loc_oversample = ZUniform::GetLoc(*program, "oversample");
+		} 
+	}
+
+	virtual void Activate(ZRenderer& renderer)
+	{
+		Update();
+		renderer.UseProgram(*program);
+		program->SetCommonLocations(renderer);
+		ZUniform::SetFloat(loc_v, v);
+		ZUniform::SetFloat(loc_oversample, oversample);
+	}
+
+	float v; ZUniLoc loc_v;
+	float oversample; ZUniLoc loc_oversample;
+};
+
 
 struct Arg: public option::Arg
 {
@@ -311,8 +400,8 @@ const option::Descriptor usage[] = {
   
 { UNKNOWN, 0,"", "",        Arg::None,
  "\nExamples:\n"
- "  knobster -d -k knob.frag -w 29 -h 29 -o 16"
- "  knobster -g -k knob.frag -w 29 -h 29 -o 16 -n 1 -f knob.png"
+ "  knobster -d -k knob.frag -w 29 -h 29 -o 15"
+ "  knobster -g -k knob.frag -w 29 -h 29 -o 15 -n 128 -f knob.png"
 },
 { 0, 0, 0, 0, 0, 0 } };
 
@@ -379,7 +468,8 @@ int main(int argc, char* argv[])
 
 	wglSwapIntervalEXT(1);
 
-	ZMGenerate knobMat;
+	ZMDisplay knobMat;
+	ZMOversample knobMatOversample;
 	ZMPassthrough passthrough;
 
 	auto mainFBO = ZFBO(ZFBODescriptor(viewportWidth, viewportHeight));
@@ -460,9 +550,10 @@ int main(int argc, char* argv[])
 			renderer.SetBlendMode(kBlendOff);
 			renderer.SetCullingMode(kCullingShowFrontAndBack);
 			renderer.SetZBufferMode(kZBufferOff);
-			knobMat.v = float(i)/float(num-1);
-			knobMat.Update();
-			knobMat.Activate(renderer);
+			knobMatOversample.v = float(i)/float(num-1);
+			knobMatOversample.oversample = float(oversampling);
+			knobMatOversample.Update();
+			knobMatOversample.Activate(renderer);
 			ZPointCloud<ZPoint>::RenderSinglePoint();
 
 			renderer.UnbindFBO();
@@ -473,11 +564,12 @@ int main(int argc, char* argv[])
 
 			ZPointCloud<ZPoint>::RenderSinglePoint();
 
+			glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data+width*height*4*(num-i-1)); // write data backwards
+			
 			// Swap buffers
 			window.SwapBuffers();
-
-			glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data+width*height*4*(num-1-i)); // write data backwards
 		}
+
 
 		stbi_write_png("out.png", width, height*num, 4, data + (num*height-1)*width*4, -width*4);
 
@@ -489,4 +581,4 @@ int main(int argc, char* argv[])
 	}
 
 	ExitProcess(0); // This is neccesary to shut down song thread
-}
+} 
