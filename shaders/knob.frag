@@ -61,9 +61,9 @@ float degtorad(float rad)
 	return rad/180.0*3.1415926;
 }
 
-vec4 bgbox(vec2 p, float deg)
+vec4 bgbox(vec2 p, float deg, float length)
 {
-	return box((translate(rotate(p, degtorad(deg)), vec2(11.5, 0.0))), 1.0, 0.5, grey(0.0, 1.0));
+	return box((translate(rotate(p, degtorad(deg)), vec2(10.5, 0.0))), length, 0.5, grey(0.0, 1.0));
 }
 
 float inside(float r, float range)
@@ -112,9 +112,9 @@ vec4 generate(vec2 pos, float v)
 		// shader under knob
 		col = overlay(col, grey(-0.15, 1.0*blurcircle(p + vec2(0.0, 1.0), 9.5, 2.0)));
 
-		col = overlay(col, bgbox(p, 90.0));
-		col = overlay(col, bgbox(p, 90.0+135.0));
-		col = overlay(col, bgbox(p, 90.0-135.0));
+		col = overlay(col, bgbox(p, 90.0, 2.0));
+		col = overlay(col, bgbox(p, 90.0+135.0, 3.0));
+		col = overlay(col, bgbox(p, 90.0-135.0, 3.0));
 
 		col = overlay(col, inrange(r, 13.5, 14.5)*grey(0.3, 1.0));
 		col = overlay(col, inrange(r, 9.5, 10.5)*grey(0.3, 1.0));
@@ -126,7 +126,7 @@ vec4 generate(vec2 pos, float v)
 
 		col.rgb += inrange(r, 7.5, 9.5)*2.0*pow(dot(p/15.0, vec2(0.0, 1.0)*1.0), 3.0);
 
-		col = overlay(col, box((translate(rotate(p, degtorad(90.0+135.0 - 270.0*v)), vec2(4.0, 0.0))), 2.5, 0.5, grey(0.0, 1.0)));
+		col = overlay(col, box((translate(rotate(p, degtorad(90.0+135.0 - 270.0*v)), vec2(4.0, 0.0))), 2.5, 1.0, grey(0.0, 1.0)));
 
 //		col = grey(0.4, blurcircle(p, 0.2, 1.1));
 	}
