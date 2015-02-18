@@ -1,23 +1,22 @@
-// generate : knobster -g -k generators/fm8_knob.frag -w 29 -h 29 -o 15 -n 128 -f knob.png
+// generate : knobster -g -k generators/fm8_knob.frag -w 29 -h 29 -o 15 -n 128 -f fm8_knob.png
 // display  : knobster -d -k generators/fm8_knob.frag -w 29 -h 29 -o 15
 
 float saturate(float v)
 {
-	return clamp(v,0.0,1.0);
+	return clamp(v, 0.0, 1.0);
 }
 
-float dist(vec2 p)
+float length(vec2 p)
 {
 	return sqrt(p.x*p.x + p.y*p.y);
 }
 
-vec4 grey(float v, float a)
+vec4 grey(float v, float a) // convert value and alpha to vec4 color
 {
 	return vec4(v*0.97, v, v*1.03, a); // slightly blue teint
-//	return vec4(v, v, v, a);
 }
 
-vec4 overlay(vec4 under, vec4 over)
+vec4 overlay(vec4 under, vec4 over) // overlay composition using non-premuliplied color values
 {
 	vec4 c;
 
@@ -27,19 +26,18 @@ vec4 overlay(vec4 under, vec4 over)
 	return c;
 }
 
-float blurcircle(vec2 p, float r, float b)
+float insideblurcircle(vec2 p, float r, float b)
 {
-	float r_ = dist(p);
+	float r_ = length(p);
 	return mix(1.0, 0.0, saturate((r_ - r + b)/(b*2)));
 }
 
-float iblurcircle(vec2 p, float r, float b)
+float outsideblurcircle(vec2 p, float r, float b)
 {
-	float r_ = dist(p);
-	return mix(0.0, 1.0, saturate((r_ - r + b)/(b*2)));
+	return 1.0 - insideblurcircle(p, r, b);
 }
 
-vec4 box(vec2 p, float width, float height, vec4 col)
+vec4 box(vec2 p, float width, float height, vec4 col) // return color if point p is inside origo-centered box with width and height
 {
 	if (p.x<width && p.x>-width && p.y<height && p.y>-height)
 		return col;
@@ -64,28 +62,28 @@ float degtorad(float rad)
 	return rad/180.0*3.1415926;
 }
 
-vec4 bgbox(vec2 p, float deg, float length)
+vec4 bgbox(vec2 p, float deg, float length) // return black color if p is inside box in background
 {
 	return box((translate(rotate(p, degtorad(deg)), vec2(10.5, 0.0))), length, 0.5, grey(0.0, 1.0));
 }
 
-float inside(float r, float range)
+float inside(float r, float max)
 {
-	if (r<=range)
+	if (r<=max)
 		return 1.0;
 
 	return 0.0;
 }
 
-float inrange(float r, float low, float high)
+float inrange(float r, float min, float max)
 {
-	if (low <= r && r <= high)
+	if (min <= r && r <= max)
 		return 1.0;
 
 	return 0.0;
 }
 
-vec4 bgshade(vec2 p)
+vec4 bgshade(vec2 p) // darkens bottom quarter of bg
 {
 	vec2 rp = rotate(p, degtorad(-135.0));
 
@@ -95,52 +93,64 @@ vec4 bgshade(vec2 p)
 	return vec4(0.0);
 }
 
+// main generation function
+// * pos is the rendered point, normalized
+// * v is the normalized knob position
 vec4 generate(vec2 pos, float v)
 {
 	vec2 p = pos*29.0-14.5;
-	float r = dist(p);
+	float r = length(p);
 
 	vec4 col = vec4(0.0);
 
 	if (r < 14.5)
 	{
+		// bg base color
 		col = grey(0.55, 1.0);
 
-		// inset shade
-		col = overlay(col, grey(0.0, 0.85*iblurcircle(p + vec2(0.0, 1.5), 13.5, 1.2)));
+		// top inset shadow
+		col = overlay(col, grey(0.0, 0.85*outsideblurcircle(p + vec2(0.0, 1.5), 13.5, 1.2)));
 
 		// darken bottom quarter
 		col = overlay(col, bgshade(p));
 
-		// shader under knob
-		col = overlay(col, grey(-0.15, 1.0*blurcircle(p + vec2(0.0, 1.0), 9.5, 2.0)));
+		// shadow under knob
+		col = overlay(col, grey(-0.15, 1.0*insideblurcircle(p + vec2(0.0, 1.0), 9.5, 2.0)));
 
+		// black markers on bg
 		col = overlay(col, bgbox(p, 90.0, 2.0));
 		col = overlay(col, bgbox(p, 90.0+135.0, 3.0));
 		col = overlay(col, bgbox(p, 90.0-135.0, 3.0));
 
+		// 1 px rings
 		col = overlay(col, inrange(r, 13.5, 14.5)*grey(0.3, 1.0));
 		col = overlay(col, inrange(r, 9.5, 10.5)*grey(0.3, 1.0));
 
+		// knob base color
 		col = overlay(col, inside(r, 9.5)*grey(1.0, 1.0));
 
+		// top knob shade
 		vec2 sp = p + vec2(0.0, -3.5);
-		col.rgb -= 0.2*inside(r, 7.5)*exp(-dist(sp)*dist(sp)*0.03);
+		col.rgb -= 0.2*inside(r, 7.5)*exp(-length(sp)*length(sp)*0.03);
 
+		// knob outer ring shade
 		col.rgb += inrange(r, 7.5, 9.5)*2.0*pow(dot(p/15.0, vec2(0.0, 1.0)*1.0), 3.0);
 
+		// knob marker
 		col = overlay(col, box((translate(rotate(p, degtorad(90.0+135.0 - 270.0*v)), vec2(4.0, 0.0))), 2.5, 1.0, grey(0.0, 1.0)));
-
-//		col = grey(0.4, blurcircle(p, 0.2, 1.1));
 	}
 
-// grid
-//	if (fract(p.x + 0.5) < 0.06 || fract(p.y+0.5) < 0.06)
-//		col = vec4(0.0);
+	// enable this to draw pixel grid in display mode
+	if (false)
+	{
+		if (fract(p.x + 0.5) < 0.06 || fract(p.y+0.5) < 0.06)
+			col = vec4(0.0);
+	}
 
 	return col;
 }
 
+// gamma correction function
 vec4 gamma(vec4 col)
 {
 	float gamma = 1.0/2.2;
