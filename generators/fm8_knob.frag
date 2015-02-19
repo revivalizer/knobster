@@ -6,11 +6,6 @@ float saturate(float v)
 	return clamp(v, 0.0, 1.0);
 }
 
-float length(vec2 p)
-{
-	return sqrt(p.x*p.x + p.y*p.y);
-}
-
 vec4 grey(float v, float a) // convert value and alpha to vec4 color
 {
 	return vec4(v*0.97, v, v*1.03, a); // slightly blue teint
