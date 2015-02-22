@@ -582,7 +582,7 @@ int main(int argc, char* argv[])
 		}
 
 
-		stbi_write_png("out.png", width, height*num, 4, data + (num*height-1)*width*4, -width*4);
+		stbi_write_png(outfile, width, height*num, 4, data + (num*height-1)*width*4, -width*4);
 
 	/*		if (curFrame==2)
 			{

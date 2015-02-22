@@ -1,5 +1,5 @@
-// generate : knobster -g -k generators/fm8_knob.frag -w 29 -h 29 -o 15 -n 128 -f fm8_knob.png
-// display  : knobster -d -k generators/fm8_knob.frag -w 29 -h 29 -o 15
+// generate : knobster -g -k generators/fm8_button.frag -w 19 -h 10 -o 15 -n 2 -f fm8_button.png
+// display  : knobster -d -k generators/fm8_button.frag -w 19 -h 10 -o 15
 
 float saturate(float v)
 {
@@ -21,25 +21,6 @@ vec4 overlay(vec4 under, vec4 over) // overlay composition using non-premuliplie
 	return c;
 }
 
-float insideblurcircle(vec2 p, float r, float b)
-{
-	float r_ = length(p);
-	return mix(1.0, 0.0, saturate((r_ - r + b)/(b*2)));
-}
-
-float outsideblurcircle(vec2 p, float r, float b)
-{
-	return 1.0 - insideblurcircle(p, r, b);
-}
-
-vec4 box(vec2 p, float width, float height, vec4 col) // return color if point p is inside origo-centered box with width and height
-{
-	if (p.x<width && p.x>-width && p.y<height && p.y>-height)
-		return col;
-	else
-		return vec4(0.0);
-}
-
 vec2 translate(vec2 p, vec2 o)
 {
 	return p - o;
@@ -50,11 +31,6 @@ vec2 rotate(vec2 p, float a)
 	mat2 rot = mat2(cos(a), -sin(a), sin(a), cos(a));
 
 	return rot*p;
-}
-
-float degtorad(float rad)
-{
-	return rad/180.0*3.1415926;
 }
 
 float inside(float r, float max)
@@ -81,19 +57,26 @@ float inrange(float r, float min, float max)
 	return 0.0;
 }
 
-vec4 bgbox(vec2 p, float deg, float size) // return black color if p is inside box in background
+vec2 rboxdir(vec2 p, vec2 b, float r)
 {
-	return outside(length(p), 10.5)*box((translate(rotate(p, degtorad(deg)), vec2(10.5, 0.0))), size, 0.5, grey(0.0, 1.0));
+	vec2 d = p;
+
+	if (d.x > 0.0)
+		d.x = 0.3 + d.x - min(d.x, b.x);
+	else
+		d.x = 0.3 + d.x - max(d.x, -b.x);
+
+	if (d.y > 0.0)
+		d.y = 0.3 + d.y - min(d.y, b.y);
+	else
+		d.y = 0.3 + d.y - max(d.y, -b.y);
+
+	return d;
 }
 
-vec4 bgshade(vec2 p) // darkens bottom quarter of bg
+float rbox( vec2 p, vec2 b, float r)
 {
-	vec2 rp = rotate(p, degtorad(-135.0));
-
-	if (rp.x >= 0.0 && rp.y >= 0.0)
-		return grey(0.2, 1.0);
-
-	return vec4(0.0);
+  return length(max(abs(p)-b,0.0))-r;
 }
 
 // main generation function
@@ -101,52 +84,44 @@ vec4 bgshade(vec2 p) // darkens bottom quarter of bg
 // * v is the normalized knob position
 vec4 generate(vec2 pos, float v)
 {
-	vec2 p = pos*29.0-14.5;
-	float r = length(p);
+	// center origo, make 1 px = 1 unit
+	vec2 p = pos * vec2(19.0, 10.0) - vec2(9.5, 5.0);
 
+	// black base color
 	vec4 col = vec4(0.0);
 
-	if (r < 14.5)
+	// distance from outer edge
+	float r = max(0.0, rbox(p, vec2(6.5, 2.0), 3.0)+3.0);
+
+	// normal of bezel
+	vec2 dir = rboxdir(p, vec2(6.5, 2.0), 3.0);
+
+	// outline
+	col = overlay(col, inrange(r, 2.0, 3.0)*grey(0.1, 1.0));
+
+	// bezel
+	col = overlay(col, inrange(r, 0.5, 2.0)*grey(0.27+saturate(0.5*dot(normalize(dir), vec2(0.0, 1.0))), 1.0));
+
+	// button center base color
+	col = overlay(col, inside(r, 0.5)*grey(0.63, 1.0));
+
+	// shade center
+	float shadedist = max(0.0, rbox(translate(p, vec2(0.0, 4.5)), vec2(2.5, 0.0), 1.0));
+	col -= 0.23*inside(r, 0.5)*exp(-shadedist*shadedist/15.0);
+
+	// if button pressed
+	if (v > 0.5)
 	{
-		// bg base color
-		col = grey(0.55, 1.0);
+		// darken
+		shadedist = max(0.0, rbox(translate(p, vec2(0.0, -3.5)), vec2(5.0, 3.5), 0.0));
 
-		// knob base color
-		col = overlay(col, inside(r, 9.5)*grey(1.0, 1.0));
+		col = overlay(col, inside(r, 2.0)*grey(0.0, 0.0 + 0.5*saturate(0.1 + 0.3*shadedist)));
 
-		// 1 px rings
-		col = overlay(col, inrange(r, 13.5, 14.5)*grey(0.3, 1.0));
-		col = overlay(col, inrange(r, 9.5, 10.5)*grey(0.3, 1.0));
-
-		// darken bottom quarter
-		col = overlay(col, inrange(r, 10.5, 13.5)*bgshade(p));
-
-		// black markers on bg
-		col = overlay(col, bgbox(p, 90.0, 2.0));
-		col = overlay(col, bgbox(p, 90.0+135.0, 3.0));
-		col = overlay(col, bgbox(p, 90.0-135.0, 3.0));
-
-		// top inset shadow
-		col = overlay(col, inrange(r, 10.5, 13.5)*grey(0.0, 0.85*outsideblurcircle(p + vec2(0.0, 1.5), 13.5, 1.2)));
-
-		// shadow under knob
-		col = overlay(col, grey(-0.15, 1.0*outside(r, 10.5)*insideblurcircle(p + vec2(0.0, 1.0), 9.5, 2.0)));
-
-		// top knob shade
-		vec2 sp = p + vec2(0.0, -3.5);
-		col.rgb -= 0.2*inside(r, 7.5)*exp(-length(sp)*length(sp)*0.03);
-
-		// knob outer ring shade
-		col.rgb += inrange(r, 7.5, 9.5)*2.0*pow(dot(p/15.0, vec2(0.0, 1.0)*1.0), 3.0);
-
-		// knob marker
-		col = overlay(col, box((translate(rotate(p, degtorad(90.0+135.0 - 270.0*v)), vec2(4.0, 0.0))), 2.5, 1.0, grey(0.0, 1.0)));
 	}
-
 	// enable this to draw pixel grid in display mode
 	if (false)
 	{
-		if (fract(p.x + 0.5) < 0.06 || fract(p.y+0.5) < 0.06)
+		if (fract(p.x + 0.5) < 0.06 || fract(p.y+0.5) < 0.0667)
 			col = overlay(col, grey(0.1, 0.75));
 	}
 
